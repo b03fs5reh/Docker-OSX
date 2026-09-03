@@ -1,24 +1,35 @@
-# Security Policy
+#!/usr/bin/env bash
 
-## Supported Versions
+set -euo pipefail
 
-Please use the latest release of Docker-OSX to ensure you have all security updates and QEMU patches.
+RAM="${RAM:-4}"
+SMP="${SMP:-4}"
+CORES="${CORES:-2}"
+LISTEN_ADDR="${LISTEN_ADDR:-127.0.0.1}"
+DISK_IMAGE="${DISK_IMAGE:-mac_hdd_ng.img}"
+EXTRA="${EXTRA:-}"
 
-| Version | Supported          |
-| ------- | ------------------ |
-| Latest  | :white_check_mark: |
-| < 1.0   | :x:                |
+echo "Starting Docker-OSX with ${RAM}G RAM..."
 
-## Reporting a Vulnerability
+if [ ! -f "${DISK_IMAGE}" ]; then
+    echo "Error: Disk image '${DISK_IMAGE}' not found." >&2
+    exit 1
+fi
 
-If you discover a security vulnerability within Docker-OSX, please report it responsibly:
-
-1. Do NOT open a public GitHub issue.
-2. Contact the maintainer directly via Twitter [@sickcodes](https://twitter.com/sickcodes) or email `sickcodes@gmail.com`.
-3. Provide a proof of concept (PoC) and details regarding your host setup (QEMU version, host OS, kernel version, Docker version).
-
-## Container & Host Security Best Practices
-
-- **KVM Access**: Limit host `/dev/kvm` access strictly to the `kvm` or `libvirt` group rather than granting global read/write permissions.
-- **VNC Exposure**: Avoid exposing VNC (default port `5900`) directly to untrusted networks. Use SSH port forwarding (`-L 5900:127.0.0.1:5900`) or a VPN.
-- **Least Privilege**: Avoid passing full `--privileged` flags when standard device passthrough (`--device /dev/kvm`) suffices for your container environment.
+qemu-system-x86_64 \
+    -enable-kvm \
+    -m "${RAM}G" \
+    -machine q35,accel=kvm:tcg \
+    -smp "${SMP},sockets=1,cores=${CORES},threads=2" \
+    -cpu Penryn,kvm=on,vendor=GenuineIntel,+invtsc,vmware-cpuid-freq=on \
+    -device isa-applesmc,osk="ourhardworkbythesewordsguardedpleasedontsteal(c)AppleComputerInc" \
+    -drive if=pflash,format=raw,readonly=on,file=OVMF_CODE.fd \
+    -drive if=pflash,format=raw,file=OVMF_VARS-1024x768.fd \
+    -smbios type=2 \
+    -device ich9-intel-hda -device hda-output \
+    -drive id=MacHDD,if=none,file="${DISK_IMAGE}",format=qcow2 \
+    -device ide-hd,bus=sata.2,drive=MacHDD \
+    -netdev user,id=net0,hostfwd=tcp:${LISTEN_ADDR}:50922-:22,hostfwd=tcp:${LISTEN_ADDR}:5900-:5900 \
+    -device vmxnet3,netdev=net0,id=net0,mac=52:54:00:c9:18:27 \
+    -monitor stdio \
+    ${EXTRA}
