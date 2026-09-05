@@ -1,35 +1,13 @@
-#!/usr/bin/env bash
+# Security Policy
 
-set -euo pipefail
+## Reporting Security Issues
 
-RAM="${RAM:-4}"
-SMP="${SMP:-4}"
-CORES="${CORES:-2}"
-LISTEN_ADDR="${LISTEN_ADDR:-127.0.0.1}"
-DISK_IMAGE="${DISK_IMAGE:-mac_hdd_ng.img}"
-EXTRA="${EXTRA:-}"
+Please report any security vulnerabilities responsibly rather than opening a public issue.
 
-echo "Starting Docker-OSX with ${RAM}G RAM..."
+- **Contact:** Reach out to the maintainers directly or submit via GitHub Private Vulnerability Reporting.
+- **Report Details:** Include a brief description, PoC or steps to reproduce, and container configuration details.
 
-if [ ! -f "${DISK_IMAGE}" ]; then
-    echo "Error: Disk image '${DISK_IMAGE}' not found." >&2
-    exit 1
-fi
+## Security & Threat Model Considerations
 
-qemu-system-x86_64 \
-    -enable-kvm \
-    -m "${RAM}G" \
-    -machine q35,accel=kvm:tcg \
-    -smp "${SMP},sockets=1,cores=${CORES},threads=2" \
-    -cpu Penryn,kvm=on,vendor=GenuineIntel,+invtsc,vmware-cpuid-freq=on \
-    -device isa-applesmc,osk="ourhardworkbythesewordsguardedpleasedontsteal(c)AppleComputerInc" \
-    -drive if=pflash,format=raw,readonly=on,file=OVMF_CODE.fd \
-    -drive if=pflash,format=raw,file=OVMF_VARS-1024x768.fd \
-    -smbios type=2 \
-    -device ich9-intel-hda -device hda-output \
-    -drive id=MacHDD,if=none,file="${DISK_IMAGE}",format=qcow2 \
-    -device ide-hd,bus=sata.2,drive=MacHDD \
-    -netdev user,id=net0,hostfwd=tcp:${LISTEN_ADDR}:50922-:22,hostfwd=tcp:${LISTEN_ADDR}:5900-:5900 \
-    -device vmxnet3,netdev=net0,id=net0,mac=52:54:00:c9:18:27 \
-    -monitor stdio \
-    ${EXTRA}
+- **Exposed Ports:** By default, exposed VNC (5900) and SSH (2222/22) ports should not be exposed to untrusted networks without updating default credentials.
+- **Host KVM Access:** Access to `/dev/kvm` allows direct hardware virtualization. Ensure container permissions are appropriate when running in multi-tenant environments.
